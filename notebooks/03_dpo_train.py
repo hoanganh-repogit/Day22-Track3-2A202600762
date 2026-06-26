@@ -21,16 +21,17 @@
 
 # %%
 import os
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 from pathlib import Path
 
 COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
 
 if COMPUTE_TIER == "T4":
     BASE_MODEL = "unsloth/Qwen2.5-3B-bnb-4bit"
-    MAX_LEN = 512
-    MAX_PROMPT_LEN = 256
+    MAX_LEN = 256
+    MAX_PROMPT_LEN = 128
     PER_DEVICE_BATCH = 1
-    GRAD_ACCUM = 8
+    GRAD_ACCUM = 16
 else:
     BASE_MODEL = "unsloth/Qwen2.5-7B-bnb-4bit"
     MAX_LEN = 1024
@@ -65,6 +66,7 @@ print(f"output:          {DPO_OUT}")
 import torch
 
 assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
+torch.backends.cuda.enable_mem_efficient_sdp(False)
 
 # %% [markdown]
 # ## 1. Load policy + reference (the VRAM story)
@@ -88,6 +90,12 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 )
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
+
+from unsloth.chat_templates import get_chat_template
+tokenizer = get_chat_template(
+    tokenizer,
+    chat_template="qwen-2.5",
+)
 
 # Load SFT adapter on top of base
 model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
@@ -129,6 +137,7 @@ dpo_config = DPOConfig(
     output_dir=str(DPO_OUT.parent / "dpo-checkpoints"),
     per_device_train_batch_size=PER_DEVICE_BATCH,
     gradient_accumulation_steps=GRAD_ACCUM,
+    gradient_checkpointing=True,
     num_train_epochs=EPOCHS,
     learning_rate=LR,
     beta=BETA,

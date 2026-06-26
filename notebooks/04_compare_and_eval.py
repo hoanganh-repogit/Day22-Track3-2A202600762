@@ -80,6 +80,12 @@ def generate_with_adapter(adapter_path: Path, prompts: list[dict], max_new_token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    from unsloth.chat_templates import get_chat_template
+    tokenizer = get_chat_template(
+        tokenizer,
+        chat_template="qwen-2.5",
+    )
+
     model = PeftModel.from_pretrained(model, str(adapter_path))
     FastLanguageModel.for_inference(model)
 
@@ -289,6 +295,17 @@ if os.environ.get("OPENAI_API_KEY"):
 elif os.environ.get("ANTHROPIC_API_KEY"):
     print("Found ANTHROPIC_API_KEY — running claude-haiku judge")
     judge_results = judge_with_anthropic(rows)
+
+if judge_results is None:
+    json_path = EVAL_OUT / "judge_results.json"
+    if json_path.exists():
+        try:
+            existing = json.loads(json_path.read_text(encoding="utf-8"))
+            if any(item.get("justification") != "MANUAL — fill in" for item in existing):
+                judge_results = existing
+                print("Loaded manual judgments from data/eval/judge_results.json")
+        except Exception:
+            pass
 
 if judge_results is None:
     print("No API keys set. Falling back to manual rubric mode.")

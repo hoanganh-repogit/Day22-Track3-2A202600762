@@ -54,6 +54,12 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    from unsloth.chat_templates import get_chat_template
+    tokenizer = get_chat_template(
+        tokenizer,
+        chat_template="qwen-2.5",
+    )
+
     model = PeftModel.from_pretrained(model, args.sft_path)
     print("Loaded SFT-mini adapter")
 

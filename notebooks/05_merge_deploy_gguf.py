@@ -68,6 +68,12 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
+from unsloth.chat_templates import get_chat_template
+tokenizer = get_chat_template(
+    tokenizer,
+    chat_template="qwen-2.5",
+)
+
 # Stack SFT-mini → DPO adapters
 SFT_PATH = REPO_ROOT / "adapters" / "sft-mini"
 model = PeftModel.from_pretrained(model, str(SFT_PATH))

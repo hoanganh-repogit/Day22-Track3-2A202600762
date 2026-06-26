@@ -38,3 +38,8 @@ hf_cache/
 .idea/
 .vscode/
 *.swp
+
+# Unsloth compiled cache / local debug logs
+unsloth_compiled_cache/
+**/unsloth_compiled_cache/
+*.log

@@ -30,10 +30,11 @@ def main():
     args = parser.parse_args()
 
     tier = os.environ.get("COMPUTE_TIER", "T4").upper()
+    os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
     if tier == "T4":
         base_model = "unsloth/Qwen2.5-3B-bnb-4bit"
-        max_len, max_prompt = 512, 256
-        batch, grad_accum = 1, 8
+        max_len, max_prompt = 256, 128
+        batch, grad_accum = 1, 16
     else:
         base_model = "unsloth/Qwen2.5-7B-bnb-4bit"
         max_len, max_prompt = 1024, 512
@@ -48,6 +49,7 @@ def main():
     print(f"Output:     {output}")
 
     import torch
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
     from datasets import Dataset
     from peft import PeftModel
     from trl import DPOConfig, DPOTrainer
@@ -58,6 +60,12 @@ def main():
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    from unsloth.chat_templates import get_chat_template
+    tokenizer = get_chat_template(
+        tokenizer,
+        chat_template="qwen-2.5",
+    )
 
     model = PeftModel.from_pretrained(model, args.sft_path, is_trainable=True)
     model = FastLanguageModel.get_peft_model(
@@ -72,6 +80,7 @@ def main():
         output_dir=str(output.parent / f"{output.name}-checkpoints"),
         per_device_train_batch_size=batch,
         gradient_accumulation_steps=grad_accum,
+        gradient_checkpointing=True,
         num_train_epochs=args.epochs,
         learning_rate=args.lr,
         beta=args.beta,
